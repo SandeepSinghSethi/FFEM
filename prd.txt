@@ -1,0 +1,159 @@
+# FlashFlood Matrix — Product Requirements Document
+
+**Version:** 1.0  
+**Hackathon:** 24-hour build  
+**Status:** Draft
+
+---
+
+## 1. Problem Statement
+
+Existing weather apps tell communities: *"Heavy rain is coming."*
+
+They do not tell district officers: *"Village X will flood in 3 hours — evacuate toward Location Y because it is 22 metres higher than the surrounding terrain."*
+
+This decision gap costs lives. FlashFlood Matrix closes it.
+
+---
+
+## 2. Product Vision
+
+> An AI-assisted disaster response platform that converts live rainfall forecasts, terrain elevation models, and graph-based routing into actionable flash-flood risk scores and evacuation decisions — before the water rises.
+
+---
+
+## 3. Goals
+
+### In Scope (24h build)
+- National risk heatmap (India choropleth by tier)
+- Terrain-aware flash-flood risk scoring per district
+- Evacuation matrix: flood zone → safe zone, road distance, elevation gain, ETA
+- District dashboard with impact data (people, villages, hospitals, schools)
+- SMS alert simulation UI
+- Dark-themed, demo-optimised React SPA
+
+### Out of Scope
+- Real-time river discharge data integration
+- Full hydrological modelling (soil saturation, land cover, runoff coefficients)
+- Actual SMS delivery pipeline
+- Mobile native app
+
+---
+
+## 4. Users
+
+| Role | Primary Need | Key Screen |
+|---|---|---|
+| District Officer | Know which blocks need evacuation now | District Dashboard, Evacuation Matrix |
+| NDRF Commander | Pre-position rescue teams by risk tier | State Heatmap, Impact Panel |
+| Hackathon Judge | Understand differentiation in < 60 seconds | Hero landing, live demo flow |
+
+---
+
+## 5. Core Value Propositions
+
+**Decision support, not data display.**  
+Every risk score maps to an explicit action: "Evacuate to Zone 4 via NH-58."
+
+**Terrain-aware routing.**  
+Safe zone recommendations account for elevation, road distance, and accessibility — not just aerial proximity.
+
+**Time-boxed alerts.**  
+Risk forecasts include a 1–6 hour window for proactive response.
+
+**Impact quantification.**  
+Every alert surfaces people, villages, hospitals, and schools at risk — the numbers officers and judges need.
+
+---
+
+## 6. Risk Score Formula
+
+```
+RiskScore = (RainfallIntensity × RainfallDuration) × TerrainFactor × DrainageFactor
+
+TerrainFactor  = 1 / (slope_deg + 0.1)       -- lower terrain = higher factor
+DrainageFactor = basin_area_km2 / drainage_capacity
+
+Thresholds:
+  > 0.75    →  Extreme   (immediate evacuation)
+  0.5–0.75  →  High      (standby)
+  0.25–0.5  →  Moderate  (watch)
+  < 0.25    →  Low       (safe)
+```
+
+This is a simplified proxy model. Judges should be told explicitly that full hydrological modelling requires multi-year data and domain expertise; our formula is calibrated against known high-risk zones (Kedarnath, Chamoli) and produces reasonable tier outputs for a 24-hour build.
+
+---
+
+## 7. Functional Requirements
+
+### FR-01 National Heatmap
+- Display India as an interactive choropleth
+- States coloured by highest district risk tier
+- Hover tooltip: state name, extreme district count, people at risk
+- Click state → navigate to State Dashboard
+
+### FR-02 State Dashboard
+- List districts ranked by risk score descending
+- Show tier badge (Extreme / High / Moderate / Low) per district
+- 3-hour forecast bar per district
+- Click district → navigate to District Dashboard
+
+### FR-03 District Dashboard
+- Risk Score Card: score (0–1), tier badge, rainfall (mm), slope (°), elevation (m)
+- Impact Panel: people at risk, villages, hospitals, schools
+- Evacuation Matrix table (see FR-04)
+- Embedded route map (see FR-05)
+- Alert Simulator panel (see FR-06)
+
+### FR-04 Evacuation Matrix
+- Table columns: Flood Zone | Safe Zone | Distance (km) | Elevation Gain (m) | ETA (min)
+- Click any row → highlight route on map
+- At least 5 rows of mock data per district
+
+### FR-05 Route Map
+- Leaflet.js map centred on selected district
+- Red markers for flood zones, green markers for safe zones
+- Polyline connecting selected flood zone to its safe zone
+- Layer toggle: satellite / street
+
+### FR-06 Alert Simulator
+- Auto-populate: district, risk tier, safe zone
+- Generate button produces SMS-formatted alert text
+- Copy to clipboard
+- Output format:
+  ```
+  FLASH FLOOD ALERT
+  Location: [District], [State]
+  Risk: [TIER]  Window: [N] hours
+  → Move to [Safe Zone Name] immediately.
+  NDMA | FlashFlood Matrix
+  ```
+
+---
+
+## 8. Non-Functional Requirements
+
+| Requirement | Target |
+|---|---|
+| Heatmap initial load | < 2 seconds |
+| District dashboard load | < 1 second (mock data) |
+| Risk score computation | < 500 ms per district |
+| Mobile responsiveness | Functional at 375px width |
+| Offline fallback | Full mock mode, zero API dependency |
+
+---
+
+## 9. Assumptions
+
+- Mock data covers 5 states, 3 districts each, 6 flood zones per district
+- SRTM slope values are pre-computed offline and served as JSON lookup — no runtime DEM processing
+- OpenWeather API is optional; build works entirely on seeded mock values
+- India GeoJSON is simplified (topojson) to stay under 500 KB
+
+---
+
+## 10. Out-of-Scope Clarifications for Judges
+
+> "Our formula is a simplified proxy, not a certified hydrological model. We acknowledge this. Post-hackathon, validation would involve collaboration with IIRS Dehradun and integration of soil saturation, land cover, and river discharge data. The decision layer — evacuation matrix, routing, impact quantification — is already built and ready for a more accurate risk input."
+

@@ -1,0 +1,484 @@
+# FlashFlood Matrix — App Flow & Information Architecture
+
+**Version:** 1.0
+
+---
+
+## 1. Information Architecture
+
+```
+FlashFlood Matrix
+│
+├── / — Landing / Hero
+│     "Evacuate Smarter" headline
+│     → CTA: "View Live Heatmap"
+│
+├── /map — National Heatmap
+│     India choropleth (state level)
+│     Colour = highest risk tier in state
+│     Hover: state name, extreme count, people at risk
+│     Click state → /state/:id
+│
+├── /state/:id — State Dashboard
+│     Districts ranked by risk score
+│     Tier badge per district
+│     3-hour forecast bar
+│     Click district → /district/:id
+│
+├── /district/:id — District Dashboard
+│     ├── RiskScoreCard
+│     │     Score, tier, rainfall mm, slope °, elevation m
+│     ├── ImpactPanel
+│     │     People at risk, villages, hospitals, schools
+│     ├── EvacuationMatrix
+│     │     Flood zone → safe zone table
+│     │     Click row → RouteMap highlights
+│     ├── RouteMap (Leaflet)
+│     │     Red markers: flood zones
+│     │     Green markers: safe zones
+│     │     Polyline: selected evacuation route
+│     └── AlertSimulator
+│           Generate → SMS text output
+│           Copy / Download buttons
+│
+└── /about — Methodology
+      Score formula explanation
+      Data sources
+      Limitations
+```
+
+---
+
+## 2. Primary User Flow — District Officer
+
+```
+1. Open app → Landing page
+   Visual: "EVACUATE SMARTER." headline, animated heatmap preview
+   Action: clicks "View Live Heatmap"
+
+2. National Heatmap loads
+   Visual: India choropleth — Uttarakhand glows red
+   Action: officer clicks Uttarakhand
+
+3. State Dashboard — Uttarakhand
+   Visual: District list, Rudraprayag shows EXTREME badge, score 0.87
+   Action: clicks Rudraprayag
+
+4. District Dashboard — Rudraprayag
+   Visual: Score card (0.87 / EXTREME), rainfall 78 mm, slope 2.3°
+   No action needed — data is immediately scannable
+
+5. Evacuation Matrix
+   Visual: 6 rows, Kalimath → GHS Block 4, 1.8 km, +22 m, 5 min
+   Action: clicks Kalimath row → map highlights route
+
+6. Route Map
+   Visual: Red pin at Kalimath, green pin at GHS Block 4, route polyline
+   Action: satisfied; moves to alert
+
+7. Alert Simulator
+   Action: clicks "Generate Alert"
+   Visual: SMS text appears in phone-frame mockup
+   Action: clicks "Copy" — ready to dispatch
+```
+
+---
+
+## 3. Screen Inventory
+
+| Screen | Route | Priority | Est. Build Time |
+|---|---|---|---|
+| Landing / Hero | / | P0 | 1.5 h |
+| National Heatmap | /map | P0 | 2 h |
+| State Dashboard | /state/:id | P0 | 2 h |
+| District Dashboard | /district/:id | P0 | 3 h |
+| Evacuation Matrix | embedded | P0 | 2 h |
+| Route Map | embedded | P0 | 2 h |
+| Alert Simulator | embedded | P1 | 1 h |
+| Methodology / About | /about | P2 | 0.5 h |
+
+**Total P0:** ~12.5 h  
+**Total P1:** ~1 h  
+**Buffer + polish:** ~10.5 h
+
+---
+
+## 4. Alert State Machine
+
+```
+[Idle]
+  │
+  ├─ rainfall data received ──→ [Computing]
+  │
+[Computing]
+  ├─ score < 0.25  ──→ [Safe]       no alert shown
+  ├─ score 0.25–0.5 ─→ [Watch]      yellow info banner
+  ├─ score 0.5–0.75 ─→ [Standby]    orange alert panel opens
+  └─ score > 0.75  ──→ [Extreme]    pulsing red banner + auto-populate SMS
+                                     ↓
+[Any alert state]
+  ├─ user clicks dismiss ──→ [Acknowledged]  banner collapses
+  └─ 24 h passes          ──→ [Idle]
+```
+
+---
+
+## 5. Data Flow Diagram
+
+```
+User selects district
+        │
+        ▼
+GET /api/risk-scores?state=UK
+        │
+        ├──→ Python risk.py
+        │         rainfall × terrain × drainage
+        │         → score, tier
+        │
+        ▼
+GET /api/evacuation-matrix?district=rudraprayag
+        │
+        ├──→ Python route_planner.py
+        │         Dijkstra on road graph
+        │         → best safe zone + route GeoJSON
+        │
+        ▼
+GET /api/impact?district=rudraprayag&tier=Extreme
+        │
+        ▼
+React renders:
+  RiskScoreCard ← score, tier, rainfall, slope, elevation
+  ImpactPanel   ← people, villages, hospitals, schools
+  EvacuationMatrix ← zone list + route GeoJSON
+  RouteMap      ← Leaflet renders polyline
+  AlertSimulator ← pre-filled with district + tier + safe zone
+```
+
+---
+
+## 6. Navigation & Routing
+
+**Router:** React Router v6 (`createBrowserRouter`)
+
+**Back navigation:** Each page has a breadcrumb: `National → Uttarakhand → Rudraprayag`
+
+**Deep-link support:** `/district/rudraprayag` loads directly without needing prior navigation (data fetched on mount via district ID)
+
+**Loading states:** Skeleton placeholders on RiskScoreCard and EvacuationMatrix while API responds
+
+**Error states:** If API fails, fall back to mock data silently (no error screen — demo must not break)
+
+---
+
+## 7. Responsive Breakpoints
+
+| Breakpoint | Layout Change |
+|---|---|
+| < 768 px | Single column. Stack RiskScoreCard + ImpactPanel vertically. Hide grid lines. Hamburger nav. Map height 260 px. |
+| 768–1024 px | 2-column dashboard (score card left, map right). Evacuation matrix below full width. |
+| > 1024 px | 3-column: score card + impact left sidebar, map centre, evacuation matrix right panel. |
+
+ENDOFFILE
+
+echo "App Flow written"
+
+cat > /mnt/user-data/outputs/flashflood-docs/IMPLEMENTATION.md << 'ENDOFFILE'
+# FlashFlood Matrix — Implementation Path
+
+**Version:** 1.0  
+**Window:** 24 hours  
+**Rule:** Each phase has a hard stop. If running over, drop remaining items and move to next phase. A working P0 beats a broken P1.
+
+---
+
+## Hour-by-Hour Roadmap
+
+```
+Hour 0–1   Phase 0: Scaffold & Deploy
+Hour 1–4   Phase 1: Risk Engine + Mock Data
+Hour 4–7   Phase 2: National Heatmap
+Hour 7–13  Phase 3: District Dashboard
+Hour 13–16 Phase 4: Alert Simulator
+Hour 16–20 Phase 5: Polish & Demo Prep
+Hour 20–24 Phase 6: Buffer / Stretch Goals
+```
+
+---
+
+## Phase 0 — Scaffold & Deploy (Hour 0–1)
+
+**Goal:** Working URL exists before a single feature is built.
+
+```bash
+# Create project
+npm create vite@latest flashflood-matrix -- --template react
+cd flashflood-matrix
+npm install
+
+# Install dependencies
+npm install tailwindcss @tailwindcss/vite leaflet react-leaflet recharts axios react-router-dom
+
+# Backend
+mkdir server && cd server
+npm init -y
+npm install express cors dotenv
+
+# Initialise Tailwind
+npx tailwindcss init -p
+```
+
+**Checklist:**
+- [ ] Vite dev server runs on localhost:5173
+- [ ] Express server runs on localhost:3001
+- [ ] `GET /api/health` returns `{ status: "ok" }`
+- [ ] `.env` created with `VITE_API_BASE` and `USE_MOCK_DATA=true`
+- [ ] Push to GitHub
+- [ ] Deploy frontend to Vercel (link GitHub repo)
+- [ ] Deploy backend to Render (free tier, link GitHub repo)
+- [ ] Public URL noted — share with team
+
+---
+
+## Phase 1 — Risk Engine + Mock Data (Hour 1–4)
+
+**Goal:** `/api/risk-scores` returns believable data. Risk formula runs.
+
+**Backend tasks:**
+
+1. Create `server/engine/risk.py`:
+```python
+def compute_risk(rainfall_mm, slope_deg, basin_area_km2, drainage_cap):
+    rainfall_factor = min(rainfall_mm / 50.0, 2.0)
+    terrain_factor  = 1.0 / (slope_deg + 0.1)
+    drainage_factor = basin_area_km2 / max(drainage_cap, 1)
+    score = min((rainfall_factor * terrain_factor * drainage_factor) / 10.0, 1.0)
+    tier = "Extreme" if score > 0.75 else "High" if score > 0.5 else "Moderate" if score > 0.25 else "Low"
+    return round(score, 2), tier
+```
+
+2. Create `client/src/data/mock-districts.json` — 5 states, 3 districts each, pre-scored.
+
+3. Create `server/routes/riskScores.js` — reads mock JSON, returns array.
+
+4. Unit-test formula:
+   - Kedarnath (high rainfall, low slope): should be Extreme
+   - Rajasthan desert (low rainfall): should be Low
+
+**Deliverable:** `GET /api/risk-scores?state=UK` returns valid JSON with at least 3 districts.
+
+---
+
+## Phase 2 — National Heatmap (Hour 4–7)
+
+**Goal:** India map renders, states are coloured by tier, clicking a state navigates correctly.
+
+**Tasks:**
+
+1. Download simplified India states GeoJSON (< 500 KB):
+   ```
+   https://raw.githubusercontent.com/geohacker/india/master/state/india_state.geojson
+   ```
+
+2. Create `HeatMap.jsx`:
+```jsx
+import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet'
+
+const tierColour = {
+  Extreme: '#ff4444',
+  High:    '#ff8c00',
+  Moderate:'#ffd700',
+  Low:     '#22c55e',
+}
+
+function style(feature) {
+  const tier = getRiskTier(feature.properties.NAME_1) // lookup from API data
+  return { fillColor: tierColour[tier], weight: 0.5, fillOpacity: 0.7 }
+}
+```
+
+3. Add hover tooltip (state name, extreme count, people at risk).
+
+4. Add click handler: `navigate('/state/' + stateId)`.
+
+5. Add CSS pulse animation for Extreme zones:
+```css
+@keyframes pulse-ring {
+  0%   { transform: scale(1);   opacity: 0.6; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+```
+
+**Deliverable:** Map loads, states are coloured, hover tooltip works, click navigates.
+
+---
+
+## Phase 3 — District Dashboard (Hour 7–13)
+
+**Goal:** Full district page with risk card, impact data, evacuation matrix, and route map.
+
+**Sub-tasks (do in order, stop if time-boxed):**
+
+### 3a — RiskScoreCard (1h)
+```jsx
+// Large score number, tier badge, three data pills
+<div className="bg-gray-900 rounded-2xl p-6">
+  <span className="text-6xl font-black text-white">{score}</span>
+  <TierBadge tier={tier} />
+  <div className="flex gap-4 mt-4">
+    <Pill label="Rainfall" value={`${rainfall} mm`} />
+    <Pill label="Slope" value={`${slope}°`} />
+    <Pill label="Elevation" value={`${elevation} m`} />
+  </div>
+</div>
+```
+
+### 3b — ImpactPanel (1h)
+Four visual cards (people, villages, hospitals, schools) — see ImpactPanel visual spec in notes.
+
+### 3c — EvacuationMatrix (2h)
+```jsx
+// Table with click handler per row
+{zones.map(zone => (
+  <tr key={zone.floodZoneId}
+      onClick={() => setSelectedRoute(zone)}
+      className={selectedRoute?.floodZoneId === zone.floodZoneId ? 'bg-green-900/20' : ''}>
+    <td>{zone.floodZoneName}</td>
+    <td>{zone.safeZoneName}</td>
+    <td>{zone.distanceKm} km</td>
+    <td>+{zone.elevationGainM} m</td>
+    <td>{zone.etaMinutes} min</td>
+  </tr>
+))}
+```
+
+### 3d — RouteMap (2h)
+```jsx
+// Leaflet map with dynamic markers and polyline
+const floodIcon  = L.divIcon({ html: '🔴', className: '' })
+const safeIcon   = L.divIcon({ html: '🟢', className: '' })
+
+<Marker position={floodZone.coords} icon={floodIcon} />
+<Marker position={safeZone.coords}  icon={safeIcon} />
+<Polyline positions={route.coordinates} color="#22c55e" weight={3} />
+```
+
+**Deliverable:** Full district page renders from mock data, clicking matrix row updates map.
+
+---
+
+## Phase 4 — Alert Simulator (Hour 13–16)
+
+**Goal:** Generate SMS alert text, display in phone-frame mockup, copy to clipboard.
+
+```jsx
+function AlertSimulator({ district, tier, safeZone }) {
+  const [alertText, setAlertText] = useState('')
+
+  const generate = async () => {
+    const res = await axios.post('/api/alert-generate', { district, tier, safeZone })
+    setAlertText(res.data.alertText)
+  }
+
+  return (
+    <div>
+      <button onClick={generate}>Generate Alert</button>
+      {alertText && (
+        <div className="font-mono text-sm bg-gray-900 rounded-xl p-4 mt-4">
+          <pre>{alertText}</pre>
+          <button onClick={() => navigator.clipboard.writeText(alertText)}>
+            Copy
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+```
+
+**Deliverable:** Alert generates, displays, copies to clipboard.
+
+---
+
+## Phase 5 — Polish & Demo Prep (Hour 16–20)
+
+**Checklist:**
+
+- [ ] Dark theme consistency pass — no white backgrounds leaking
+- [ ] Fake live ticker: `setInterval` increments rainfall +0.1 mm every 5 s on district page
+- [ ] Breadcrumb navigation: `National → Uttarakhand → Rudraprayag`
+- [ ] Loading skeletons on RiskScoreCard and EvacuationMatrix
+- [ ] Error boundary: API failure silently falls back to mock data
+- [ ] Responsive check at 375 px width
+- [ ] `/about` page: score formula, data sources, one-paragraph limitations caveat
+- [ ] Test full demo flow 3× end-to-end
+- [ ] Record 2-minute screen recording as backup
+
+---
+
+## Phase 6 — Buffer / Stretch Goals (Hour 20–24)
+
+Only if Phase 0–5 are complete and stable.
+
+**Stretch goals (pick any):**
+
+- [ ] Integrate real OpenWeather API for 5 target districts (`USE_MOCK_DATA=false`)
+- [ ] OSRM routing for real road geometry: `http://router.project-osrm.org/route/v1/driving/{coords}`
+- [ ] Claude API alert narrative: POST to `/v1/messages` to generate human-readable alert prose
+- [ ] Twilio sandbox SMS: send real test message to your own phone number
+- [ ] 5-slide pitch deck: problem / solution / demo / tech / impact
+
+---
+
+## Critical Commands Reference
+
+```bash
+# Dev
+cd client && npm run dev          # localhost:5173
+cd server && node index.js        # localhost:3001
+
+# Build
+cd client && npm run build        # dist/
+
+# Deploy frontend (Vercel)
+npx vercel --prod
+
+# Deploy backend (Render)
+# Push to GitHub → Render auto-deploys
+
+# Test risk engine
+python3 server/engine/risk.py
+
+# Run with mock data (no API keys needed)
+USE_MOCK_DATA=true node server/index.js
+```
+
+---
+
+## Team Split Suggestion
+
+| Task | Hours | Role |
+|---|---|---|
+| Risk engine + Express API | 4 h | Backend |
+| National heatmap | 2 h | Frontend |
+| District dashboard UI | 4 h | Frontend |
+| Evacuation matrix + routing | 3 h | Both |
+| Alert simulator | 1 h | Frontend |
+| Polish + demo prep | 4 h | Both |
+| Buffer | 6 h | — |
+
+---
+
+## Do-Not-Touch List
+
+Things that look tempting but will burn your time budget:
+
+- Do not attempt real-time DEM processing during the hackathon
+- Do not implement user authentication
+- Do not build a mobile app
+- Do not add a database — static JSON is sufficient and faster
+- Do not integrate river discharge data (HEC-RAS, CWC) — too complex
+- Do not spend more than 30 minutes on any single CSS animation
+
+ENDOFFILE
+
+echo "Implementation written"

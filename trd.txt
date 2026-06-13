@@ -1,0 +1,325 @@
+# FlashFlood Matrix — Technical Requirements Document
+
+**Version:** 1.0  
+**Stack:** React 18 + Node.js + Python (risk engine)  
+**Status:** Draft
+
+---
+
+## 1. Technology Stack
+
+| Layer | Technology | Reason |
+|---|---|---|
+| Frontend | React 18 + Vite | Fast HMR, easy deploy to Vercel |
+| Styling | Tailwind CSS | Rapid dark-theme iteration |
+| Map | Leaflet.js + react-leaflet | Open-source, GeoJSON native |
+| Charts | Recharts | Zero config, Tailwind compatible |
+| Backend | Node.js + Express | Lightweight API layer |
+| Risk Engine | Python 3 (numpy, rasterio) | DEM processing, numerical scoring |
+| Data | OpenWeather API, NASA SRTM, OSM | Free tier sufficient for hackathon |
+| Deploy | Vercel (frontend) + Render (backend) | Free tier, instant deploy |
+
+---
+
+## 2. System Architecture
+
+```
+┌──────────────────────────────────────────────────────┐
+│                 React SPA (Vite)                      │
+│                                                       │
+│  ┌───────────┐  ┌────────────────┐  ┌─────────────┐  │
+│  │ HeatMap   │  │DistrictDashboard│  │AlertSimulator│  │
+│  │ (Leaflet) │  │                │  │             │  │
+│  └─────┬─────┘  └───────┬────────┘  └──────┬──────┘  │
+└────────┼────────────────┼──────────────────┼─────────┘
+         │                │                  │
+         └────────────────┼──────────────────┘
+                          │  REST (JSON)
+         ┌────────────────▼───────────────────┐
+         │        Node.js / Express            │
+         │                                     │
+         │  GET  /api/risk-scores              │
+         │  GET  /api/evacuation-matrix        │
+         │  GET  /api/impact                   │
+         │  POST /api/alert-generate           │
+         └────────────────┬───────────────────┘
+                          │  subprocess / HTTP
+         ┌────────────────▼───────────────────┐
+         │         Python Risk Engine          │
+         │                                     │
+         │  risk.py          (scoring)         │
+         │  dem_parser.py    (elevation data)  │
+         │  route_planner.py (Dijkstra)        │
+         └────────────────┬───────────────────┘
+                          │
+        ┌─────────────────┼──────────────────┐
+        ▼                 ▼                  ▼
+  OpenWeather API    NASA SRTM          OpenStreetMap
+  (rainfall JSON)    (GeoTIFF/JSON)     (GeoJSON)
+```
+
+---
+
+## 3. Data Sources
+
+| Dataset | Source | Format | Refresh |
+|---|---|---|---|
+| Rainfall intensity | OpenWeather API | JSON | Hourly |
+| Elevation (DEM) | NASA SRTM 30m | GeoTIFF → pre-processed JSON | Static |
+| Drainage basins | HydroSHEDS | GeoJSON | Static |
+| Road network | OpenStreetMap | GeoJSON | Weekly |
+| Population grid | WorldPop 2020 | Raster → pre-processed JSON | Static |
+| Flood history | NDMA India | CSV | Annual |
+| India boundaries | Datameet / GADM | GeoJSON (simplified) | Static |
+
+**Hackathon note:** All datasets except OpenWeather are pre-processed and bundled as static JSON. The app ships with a full mock dataset so it runs offline without any API key.
+
+---
+
+## 4. API Specification
+
+### GET /api/risk-scores
+
+**Query params:** `state` (string), `date` (ISO 8601, optional)
+
+**Response:**
+```json
+{
+  "state": "UK",
+  "generatedAt": "2026-06-13T10:00:00Z",
+  "districts": [
+    {
+      "id": "rudraprayag",
+      "name": "Rudraprayag",
+      "riskScore": 0.87,
+      "tier": "Extreme",
+      "rainfallMm": 78,
+      "slopeDeg": 2.3,
+      "elevationM": 1242,
+      "forecastWindowHours": 3
+    }
+  ]
+}
+```
+
+---
+
+### GET /api/evacuation-matrix
+
+**Query params:** `district` (string)
+
+**Response:**
+```json
+{
+  "district": "rudraprayag",
+  "zones": [
+    {
+      "floodZoneId": "kalimath",
+      "floodZoneName": "Kalimath",
+      "safeZoneId": "ghs-block4",
+      "safeZoneName": "Govt. High School Block 4",
+      "distanceKm": 1.8,
+      "elevationGainM": 22,
+      "etaMinutes": 5,
+      "routeGeoJSON": { "type": "LineString", "coordinates": [[...]] }
+    }
+  ]
+}
+```
+
+---
+
+### GET /api/impact
+
+**Query params:** `district` (string), `tier` (extreme | high | moderate)
+
+**Response:**
+```json
+{
+  "district": "rudraprayag",
+  "tier": "Extreme",
+  "peopleAffected": 12400,
+  "villagesAffected": 8,
+  "hospitalsAtRisk": 2,
+  "schoolsAtRisk": 5
+}
+```
+
+---
+
+### POST /api/alert-generate
+
+**Request body:**
+```json
+{
+  "location": "Rudraprayag, Uttarakhand",
+  "riskTier": "Extreme",
+  "safeZoneName": "Govt. High School Block 4",
+  "forecastWindowHours": 3
+}
+```
+
+**Response:**
+```json
+{
+  "alertText": "FLASH FLOOD ALERT\nLocation: Rudraprayag, Uttarakhand\nRisk: EXTREME  Window: 3 hours\n→ Move to Govt. High School Block 4 immediately.\nNDMA | FlashFlood Matrix",
+  "smsSummary": "FLOOD ALERT Rudraprayag EXTREME. Evacuate to GHS Block 4 now. -FlashFlood Matrix"
+}
+```
+
+---
+
+## 5. Python Risk Engine
+
+### risk.py
+
+```python
+import numpy as np
+
+def compute_risk(rainfall_mm: float, slope_deg: float,
+                 basin_area_km2: float, drainage_cap: float) -> tuple[float, str]:
+    """
+    Simplified flash-flood risk score.
+    Returns: (score 0-1, tier label)
+    """
+    rainfall_factor = min(rainfall_mm / 50.0, 2.0)
+    terrain_factor  = 1.0 / (slope_deg + 0.1)
+    drainage_factor = basin_area_km2 / max(drainage_cap, 1)
+
+    raw = rainfall_factor * terrain_factor * drainage_factor
+    score = min(raw / 10.0, 1.0)
+
+    if score > 0.75:   tier = "Extreme"
+    elif score > 0.5:  tier = "High"
+    elif score > 0.25: tier = "Moderate"
+    else:              tier = "Low"
+
+    return round(score, 2), tier
+```
+
+### route_planner.py
+
+```python
+import networkx as nx
+
+def find_safest_route(G: nx.Graph, flood_node: str,
+                      safe_nodes: list[str]) -> dict | None:
+    """
+    Dijkstra over road graph.
+    Edge weights: distance_km + elevation_penalty (downhill = penalised).
+    Returns best route dict or None if no path exists.
+    """
+    best = None
+    for sz in safe_nodes:
+        try:
+            path = nx.dijkstra_path(G, flood_node, sz, weight="weighted_cost")
+            cost = nx.dijkstra_path_length(G, flood_node, sz, weight="weighted_cost")
+            if best is None or cost < best["cost"]:
+                best = {"safe_zone": sz, "path": path, "cost": cost}
+        except nx.NetworkXNoPath:
+            continue
+    return best
+```
+
+---
+
+## 6. Frontend Component Tree
+
+```
+App
+├── Router
+│   ├── / → LandingPage
+│   ├── /map → NationalHeatmap
+│   ├── /state/:id → StatePage
+│   └── /district/:id → DistrictPage
+│       ├── RiskScoreCard
+│       ├── ImpactPanel
+│       ├── EvacuationMatrix
+│       ├── RouteMap (Leaflet)
+│       └── AlertSimulator
+└── shared/
+    ├── Navbar
+    ├── RiskBadge
+    └── LoadingSpinner
+```
+
+---
+
+## 7. File Structure
+
+```
+flashflood-matrix/
+├── client/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── HeatMap.jsx
+│   │   │   ├── EvacuationMatrix.jsx
+│   │   │   ├── ImpactPanel.jsx
+│   │   │   ├── AlertSimulator.jsx
+│   │   │   ├── RiskScoreCard.jsx
+│   │   │   └── RouteMap.jsx
+│   │   ├── pages/
+│   │   │   ├── Landing.jsx
+│   │   │   ├── StatePage.jsx
+│   │   │   └── DistrictPage.jsx
+│   │   ├── data/
+│   │   │   ├── mock-districts.json
+│   │   │   ├── mock-impact.json
+│   │   │   └── india-states.geojson
+│   │   ├── hooks/
+│   │   │   └── useRiskData.js
+│   │   └── App.jsx
+│   ├── index.html
+│   └── vite.config.js
+├── server/
+│   ├── index.js
+│   ├── routes/
+│   │   ├── riskScores.js
+│   │   ├── evacuationMatrix.js
+│   │   ├── impact.js
+│   │   └── alertGenerate.js
+│   └── engine/
+│       ├── risk.py
+│       ├── dem_parser.py
+│       └── route_planner.py
+├── .env.example
+├── package.json
+└── README.md
+```
+
+---
+
+## 8. Environment Variables
+
+```bash
+# .env.example
+OPENWEATHER_API_KEY=your_key_here
+VITE_API_BASE=http://localhost:3001
+PORT=3001
+USE_MOCK_DATA=true   # set false to hit live APIs
+```
+
+---
+
+## 9. Performance Targets
+
+| Operation | Target |
+|---|---|
+| Risk score (100 zones) | < 500 ms |
+| Evacuation matrix generation | < 2 s per district |
+| Map tile load | < 1.5 s |
+| API response p95 | < 800 ms |
+| Bundle size (gzipped) | < 400 KB |
+
+---
+
+## 10. Risk Mitigations
+
+| Risk | Mitigation |
+|---|---|
+| Real DEM too slow to process live | Pre-compute slope values; serve as JSON lookup |
+| OpenWeather rate limits | `USE_MOCK_DATA=true` flag; swap in Phase 6 |
+| India GeoJSON > 5 MB | Use topojson simplified to < 500 KB |
+| Demo internet unstable | Offline mock mode, all data bundled |
+| Python subprocess latency | Cache results in memory; recompute only on fresh data |
+
