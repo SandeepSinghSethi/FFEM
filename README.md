@@ -46,8 +46,7 @@ DrainageFactor = basin_area_km2 / drainage_capacity
 ## 🏗️ System Architecture
 
 *   **Frontend:** React 18 SPA built with Vite, styled with Tailwind CSS, and visualised using Leaflet.js & Recharts.
-*   **Backend:** Node.js/Express API layer serving data and alerts.
-*   **Risk Engine:** Python 3 (numpy, rasterio) handling DEM processing and Dijkstra routing (`networkx`).
+*   **Backend:** Node.js/ layer serving data and alerts.
 *   **Data Sources:** OpenWeather API, NASA SRTM (Elevation), HydroSHEDS, OpenStreetMap, WorldPop.
 
 ## 🚀 Getting Started
@@ -56,37 +55,19 @@ The platform runs offline by default using bundled mock data (zero API dependenc
 
 ### Prerequisites
 
-*   Node.js (v16+)
-*   Python (3.8+)
+*   Node.js (v20+)
 
 ### Installation
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/yourusername/flashflood-matrix.git
-    cd flashflood-matrix
+    git clone https://github.com/SandeepSinghSethi/FFEM.git
+    cd FFEM
     ```
 
-2.  **Environment Setup:**
-    Create a `.env` file in the root directory:
+2.  **Run the Backend (Node.js):**
     ```bash
-    OPENWEATHER_API_KEY=your_key_here
-    VITE_API_BASE=http://localhost:3001
-    PORT=3001
-    USE_MOCK_DATA=true # Set to false to hit live APIs
-    ```
-
-3.  **Run the Backend (Node.js + Python):**
-    ```bash
-    cd server
-    npm install
-    npm start
-    ```
-
-4.  **Run the Frontend:**
-    ```bash
-    cd client
-    npm install
+    npm run build
     npm run dev
     ```
 
