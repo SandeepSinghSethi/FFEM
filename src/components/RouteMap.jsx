@@ -1,15 +1,13 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { getTierColor } from '../utils/riskEngine'
-import { Layers } from 'lucide-react'
-import { useState } from 'react'
 
 // Custom marker icons using SVG
 function createIcon(color, size = 28) {
   return L.divIcon({
     html: `<svg width="${size}" height="${size}" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="14" cy="14" r="12" fill="${color}" fill-opacity="0.3" stroke="${color}" stroke-width="2"/>
+      <circle cx="14" cy="14" r="12" fill="${color}" fill-opacity="0.25" stroke="${color}" stroke-width="2"/>
       <circle cx="14" cy="14" r="5" fill="${color}"/>
     </svg>`,
     className: '',
@@ -56,20 +54,21 @@ export default function RouteMap({ zones, selectedZone, districtCenter, tier }) 
 
   return (
     <div className="glass-surface overflow-hidden animate-fade-in-up animate-delay-300 relative">
-      <div className="flex items-center justify-between px-6 pt-4 pb-2">
-        <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-5 sm:px-6 pt-4 pb-3">
+        <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-[0.15em]">
           Route Map
         </h3>
         {/* Layer toggle */}
-        <div className="flex items-center gap-1 bg-white/[0.05] rounded-lg p-0.5">
+        <div className="flex items-center gap-0.5 bg-white/[0.04] rounded-lg p-0.5 border border-white/[0.04]">
           {Object.keys(tiles).map(key => (
             <button
               key={key}
               onClick={() => setTileLayer(key)}
-              className={`px-2 py-1 rounded-md text-[10px] font-semibold uppercase tracking-wider transition-all ${
+              className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all duration-200 ${
                 tileLayer === key
-                  ? 'bg-[#5ed29c]/20 text-[#5ed29c]'
-                  : 'text-white/40 hover:text-white/60'
+                  ? 'bg-[#5ed29c]/15 text-[#5ed29c]'
+                  : 'text-white/30 hover:text-white/50'
               }`}
               id={`layer-toggle-${key}`}
             >
@@ -79,7 +78,8 @@ export default function RouteMap({ zones, selectedZone, districtCenter, tier }) 
         </div>
       </div>
 
-      <div className="h-[350px] md:h-[400px]">
+      {/* Map */}
+      <div className="h-[350px] sm:h-[420px] lg:h-[450px]">
         <MapContainer
           center={districtCenter || [30.2869, 79.0127]}
           zoom={12}
@@ -135,8 +135,8 @@ export default function RouteMap({ zones, selectedZone, districtCenter, tier }) 
               positions={selectedZone.route}
               pathOptions={{
                 color: '#5ed29c',
-                weight: 4,
-                opacity: 0.9,
+                weight: 3,
+                opacity: 0.85,
                 dashArray: '8, 4',
               }}
             />
@@ -146,17 +146,17 @@ export default function RouteMap({ zones, selectedZone, districtCenter, tier }) 
 
       {/* Route info bar */}
       {selectedZone && (
-        <div className="px-6 py-3 border-t border-white/[0.06] flex items-center gap-4 text-xs text-white/50">
-          <span className="flex items-center gap-1">
+        <div className="px-5 sm:px-6 py-3 border-t border-white/[0.05] flex flex-wrap items-center gap-3 sm:gap-4 text-[11px] sm:text-xs text-white/45">
+          <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: getTierColor(tier) }} />
-            {selectedZone.floodZoneName}
+            <span className="font-medium">{selectedZone.floodZoneName}</span>
           </span>
-          <span className="text-white/20">→</span>
-          <span className="flex items-center gap-1">
+          <span className="text-white/15">→</span>
+          <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-[#22c55e]" />
-            {selectedZone.safeZoneName}
+            <span className="font-medium">{selectedZone.safeZoneName}</span>
           </span>
-          <span className="ml-auto font-mono text-[#5ed29c]">
+          <span className="ml-auto font-mono text-[#5ed29c] text-[11px]">
             {selectedZone.distanceKm} km · +{selectedZone.elevationGainM}m · {selectedZone.etaMinutes} min
           </span>
         </div>

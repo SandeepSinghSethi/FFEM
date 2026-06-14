@@ -11,7 +11,6 @@ export default function AlertSimulator({ district }) {
     setIsGenerating(true)
     setCopied(false)
 
-    // Simulate network delay for realism
     setTimeout(() => {
       const result = generateAlert({
         location: `${district.name}, ${district.stateName}`,
@@ -33,15 +32,17 @@ export default function AlertSimulator({ district }) {
   }
 
   return (
-    <div className="glass-surface p-6 animate-fade-in-up animate-delay-400">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">
+    <div className="glass-surface p-5 sm:p-6 animate-fade-in-up animate-delay-400">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-[0.15em]">
           Alert Simulator
         </h3>
-        <Smartphone className="w-4 h-4 text-white/20" />
+        <div className="w-7 h-7 rounded-lg bg-white/[0.03] flex items-center justify-center">
+          <Smartphone className="w-3.5 h-3.5 text-white/20" />
+        </div>
       </div>
 
-      <p className="text-xs text-white/40 mb-4">
+      <p className="text-[12px] text-white/35 mb-4 leading-relaxed">
         Generate SMS-formatted emergency alerts for dispatch to district officers and emergency services.
       </p>
 
@@ -49,7 +50,7 @@ export default function AlertSimulator({ district }) {
       <button
         onClick={handleGenerate}
         disabled={isGenerating}
-        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#5ed29c] text-[#070b0a] font-bold text-sm uppercase tracking-wide hover:bg-[#4ecdc4] transition-all disabled:opacity-60 disabled:cursor-not-allowed glow-btn"
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#5ed29c] text-[#070b0a] font-bold text-[13px] uppercase tracking-wide hover:bg-[#4ecdc4] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed glow-btn"
         id="generate-alert-btn"
       >
         {isGenerating ? (
@@ -67,52 +68,50 @@ export default function AlertSimulator({ district }) {
 
       {/* Alert output */}
       {alert && (
-        <div className="mt-4 space-y-3">
+        <div className="mt-4 space-y-3 animate-fade-in-up">
           {/* Phone frame mockup */}
           <div className="phone-frame mx-auto">
-            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/[0.06]">
-              <AlertTriangle className="w-4 h-4 text-[#ff4444]" />
-              <span className="text-xs font-bold text-white/80 uppercase tracking-wider">
+            <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-white/[0.05]">
+              <AlertTriangle className="w-3.5 h-3.5 text-[#ff4444]" />
+              <span className="text-[10px] font-bold text-white/70 uppercase tracking-[0.15em]">
                 Emergency SMS
               </span>
             </div>
-            <pre className="text-xs text-white/80 font-mono whitespace-pre-wrap leading-relaxed">
+            <pre className="text-[11px] text-white/75 font-mono whitespace-pre-wrap leading-relaxed">
               {alert.alertText}
             </pre>
-            <div className="mt-3 pt-2 border-t border-white/[0.06]">
-              <span className="text-[10px] text-white/30">
+            <div className="mt-3 pt-2.5 border-t border-white/[0.05]">
+              <span className="text-[9px] text-white/25 font-mono">
                 {new Date().toLocaleTimeString()} · FlashFlood Matrix
               </span>
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-2">
-            <button
-              onClick={handleCopy}
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.08] text-xs font-semibold text-white/70 hover:bg-white/[0.08] transition-all"
-              id="copy-alert-btn"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-[#5ed29c]" />
-                  <span className="text-[#5ed29c]">Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5" />
-                  Copy Alert
-                </>
-              )}
-            </button>
-          </div>
+          {/* Copy button */}
+          <button
+            onClick={handleCopy}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-[12px] font-semibold text-white/60 hover:bg-white/[0.06] hover:border-white/[0.1] transition-all duration-300"
+            id="copy-alert-btn"
+          >
+            {copied ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-[#5ed29c]" />
+                <span className="text-[#5ed29c]">Copied!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5" />
+                Copy Alert
+              </>
+            )}
+          </button>
 
           {/* SMS Summary */}
-          <div className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-            <span className="text-[10px] text-white/30 uppercase tracking-wider block mb-1">
+          <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+            <span className="text-[9px] text-white/25 uppercase tracking-[0.12em] font-bold block mb-1.5">
               SMS Summary (160 chars)
             </span>
-            <p className="text-xs text-white/60 font-mono">{alert.smsSummary}</p>
+            <p className="text-[11px] text-white/50 font-mono leading-relaxed">{alert.smsSummary}</p>
           </div>
         </div>
       )}

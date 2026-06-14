@@ -1,13 +1,12 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MapContainer, TileLayer, GeoJSON, Tooltip as LeafletTooltip } from 'react-leaflet'
+import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet'
 import indiaStatesGeo from '../data/indiaStatesGeo'
 import states, { getStateTier, getStateData } from '../data/states'
-import districts from '../data/districts'
 import Breadcrumb from '../components/Breadcrumb'
 import RiskBadge from '../components/RiskBadge'
-import { getTierColor, getTierBg } from '../utils/riskEngine'
-import { Users, AlertTriangle, ArrowRight, MapPin } from 'lucide-react'
+import { getTierColor } from '../utils/riskEngine'
+import { Users, AlertTriangle, ArrowRight, MapPin, Activity } from 'lucide-react'
 
 export default function NationalHeatmap() {
   const navigate = useNavigate()
@@ -29,8 +28,8 @@ export default function NationalHeatmap() {
     return {
       fillColor: tier ? tierColour[tier] : '#1a2a24',
       weight: isHovered ? 2 : 0.8,
-      color: isHovered ? '#5ed29c' : (isMonitored ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.06)'),
-      fillOpacity: tier ? (isHovered ? 0.7 : 0.5) : 0.15,
+      color: isHovered ? '#5ed29c' : (isMonitored ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)'),
+      fillOpacity: tier ? (isHovered ? 0.65 : 0.45) : 0.12,
       dashArray: isMonitored ? '' : '3',
     }
   }
@@ -44,7 +43,7 @@ export default function NationalHeatmap() {
         e.target.setStyle({
           weight: 2,
           color: '#5ed29c',
-          fillOpacity: 0.7,
+          fillOpacity: 0.65,
         })
         e.target.bringToFront()
       },
@@ -65,41 +64,38 @@ export default function NationalHeatmap() {
   const totalPeople = states.reduce((sum, s) => sum + s.peopleAtRisk, 0)
 
   return (
-    <div className="pt-28 min-h-screen">
-      <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-10 py-8">
+    <div className="page-wrapper">
+      <div className="page-container">
         <Breadcrumb items={[{ label: 'National Heatmap' }]} />
 
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-5 mb-10">
+        {/* ── Header ── */}
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-5 mb-8 animate-fade-in-up animate-delay-100">
           <div>
-            <h1 className="text-3xl font-black text-white mb-3">
+            <h1 className="text-2xl sm:text-3xl font-black text-white mb-2.5">
               National Risk Heatmap
             </h1>
-            <p className="text-sm text-white/50 max-w-lg leading-relaxed">
+            <p className="text-sm text-white/45 max-w-lg leading-relaxed">
               India choropleth colored by highest district risk tier per state.
               Click a monitored state to view district-level data.
             </p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-[#ff4444]/10 border border-[#ff4444]/20">
-              <AlertTriangle className="w-4 h-4 text-[#ff4444]" />
-              <span className="text-xs font-bold text-[#ff4444]">
-                {totalExtremeDistricts} Extreme
-              </span>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="stat-pill" style={{ borderColor: 'rgba(255,68,68,0.2)', background: 'rgba(255,68,68,0.06)' }}>
+              <AlertTriangle className="w-3.5 h-3.5 text-[#ff4444]" />
+              <span className="text-[#ff4444] font-bold">{totalExtremeDistricts} Extreme</span>
             </div>
-            <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-              <Users className="w-4 h-4 text-white/50" />
-              <span className="text-xs font-semibold text-white/70">
-                {totalPeople.toLocaleString()} at risk
-              </span>
+            <div className="stat-pill">
+              <Users className="w-3.5 h-3.5 text-white/40" />
+              <span className="text-white/60">{totalPeople.toLocaleString()} at risk</span>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* ── Map + Sidebar ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 animate-fade-in-up animate-delay-200">
           {/* Map */}
-          <div className="lg:col-span-2 glass-surface overflow-hidden">
-            <div className="h-[500px] md:h-[600px]">
+          <div className="lg:col-span-8 glass-surface overflow-hidden">
+            <div className="h-[420px] sm:h-[500px] lg:h-[580px]">
               <MapContainer
                 center={[22.5, 82]}
                 zoom={5}
@@ -122,53 +118,65 @@ export default function NationalHeatmap() {
             </div>
 
             {/* Legend */}
-            <div className="px-6 py-3 border-t border-white/[0.06] flex items-center gap-6 text-xs text-white/40">
+            <div className="px-5 py-3 border-t border-white/[0.05] flex flex-wrap items-center gap-4 sm:gap-5 text-[11px] text-white/35">
               {['Extreme', 'High', 'Moderate', 'Low'].map(tier => (
                 <div key={tier} className="flex items-center gap-1.5">
                   <span
-                    className="w-3 h-3 rounded-sm"
-                    style={{ backgroundColor: tierColour[tier], opacity: 0.6 }}
+                    className="w-2.5 h-2.5 rounded-[3px]"
+                    style={{ backgroundColor: tierColour[tier], opacity: 0.7 }}
                   />
                   {tier}
                 </div>
               ))}
-              <div className="flex items-center gap-1.5 ml-4">
-                <span className="w-3 h-3 rounded-sm bg-[#1a2a24] border border-white/10" />
+              <div className="flex items-center gap-1.5 ml-auto sm:ml-2">
+                <span className="w-2.5 h-2.5 rounded-[3px] bg-[#1a2a24] border border-white/10" />
                 Not Monitored
               </div>
             </div>
           </div>
 
           {/* State list sidebar */}
-          <div className="glass-surface p-7 h-fit">
-            <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider mb-5">
-              Monitored States
-            </h3>
-            <div className="space-y-3">
-              {states.map(state => (
+          <div className="lg:col-span-4 glass-surface p-5 sm:p-6 h-fit max-h-[640px] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-[0.15em]">
+                Monitored States
+              </h3>
+              <span className="text-[10px] text-white/20 font-mono">{states.length} total</span>
+            </div>
+            <div className="space-y-2.5">
+              {states.map((state, i) => (
                 <button
                   key={state.id}
                   onClick={() => navigate(`/state/${state.id}`)}
-                  className="w-full flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.05] hover:border-[#5ed29c]/20 transition-all group"
+                  className="w-full flex items-center justify-between p-3.5 sm:p-4 rounded-xl bg-white/[0.015] border border-white/[0.05] hover:bg-white/[0.04] hover:border-[#5ed29c]/20 transition-all duration-300 group animate-fade-in-up"
+                  style={{ animationDelay: `${300 + i * 80}ms` }}
                   id={`state-link-${state.id}`}
                 >
-                  <div className="flex items-center gap-3">
-                    <MapPin className="w-4 h-4 text-white/30 group-hover:text-[#5ed29c] transition-colors flex-shrink-0" />
-                    <div className="text-left">
-                      <span className="text-sm font-semibold text-white block">{state.name}</span>
-                      <span className="text-[11px] text-white/40 mt-0.5 block">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-white/[0.03]">
+                      <MapPin className="w-3.5 h-3.5 text-white/25 group-hover:text-[#5ed29c] transition-colors duration-300" />
+                    </div>
+                    <div className="text-left min-w-0">
+                      <span className="text-[13px] font-semibold text-white block truncate">
+                        {state.name}
+                      </span>
+                      <span className="text-[10px] text-white/30 mt-0.5 block">
                         {state.districtCount} districts · {state.peopleAtRisk.toLocaleString()} at risk
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2.5 flex-shrink-0 ml-3">
+                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                     <RiskBadge tier={state.highestTier} size="sm" />
-                    <ArrowRight className="w-3.5 h-3.5 text-white/20 group-hover:text-[#5ed29c] transition-colors" />
+                    <ArrowRight className="w-3.5 h-3.5 text-white/15 group-hover:text-[#5ed29c] group-hover:translate-x-0.5 transition-all duration-300" />
                   </div>
                 </button>
               ))}
             </div>
           </div>
+        </div>
+
+        <div className="footer-line">
+          FlashFlood Matrix · National Overview
         </div>
       </div>
     </div>

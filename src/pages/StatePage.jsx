@@ -5,7 +5,7 @@ import Breadcrumb from '../components/Breadcrumb'
 import RiskBadge from '../components/RiskBadge'
 import ForecastBar from '../components/ForecastBar'
 import { getTierColor } from '../utils/riskEngine'
-import { ArrowRight, Users, TrendingUp } from 'lucide-react'
+import { ArrowRight, Users, Droplets, Mountain, TrendingUp } from 'lucide-react'
 
 export default function StatePage() {
   const { stateId } = useParams()
@@ -15,18 +15,23 @@ export default function StatePage() {
 
   if (!state) {
     return (
-      <div className="pt-28 min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-white/60 mb-2">State Not Found</h2>
-          <p className="text-sm text-white/40">The requested state could not be found in the monitoring system.</p>
+      <div className="page-wrapper flex items-center justify-center">
+        <div className="text-center animate-fade-in-up">
+          <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mx-auto mb-5">
+            <Mountain className="w-7 h-7 text-white/20" />
+          </div>
+          <h2 className="text-xl font-bold text-white/60 mb-2">State Not Found</h2>
+          <p className="text-sm text-white/35 max-w-sm">
+            The requested state could not be found in the monitoring system.
+          </p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="pt-28 min-h-screen">
-      <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-10 py-8">
+    <div className="page-wrapper">
+      <div className="page-container">
         <Breadcrumb
           items={[
             { label: 'National', to: '/map' },
@@ -34,89 +39,103 @@ export default function StatePage() {
           ]}
         />
 
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-5 mb-10">
+        {/* ── Header ── */}
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-5 mb-8 animate-fade-in-up animate-delay-100">
           <div>
-            <div className="flex items-center gap-3 mb-3">
-              <h1 className="text-3xl font-black text-white">{state.name}</h1>
+            <div className="flex items-center gap-3 mb-2.5">
+              <h1 className="text-2xl sm:text-3xl font-black text-white">{state.name}</h1>
               <RiskBadge tier={state.highestTier} size="lg" pulse={state.highestTier === 'Extreme'} />
             </div>
-            <p className="text-sm text-white/50 leading-relaxed">
+            <p className="text-sm text-white/45 leading-relaxed">
               {state.districtCount} districts monitored · {state.peopleAtRisk.toLocaleString()} people at risk
             </p>
           </div>
 
           {/* Summary pills */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 flex-shrink-0">
             {state.extremeCount > 0 && (
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#ff4444]/10 border border-[#ff4444]/20">
+              <div className="stat-pill" style={{ borderColor: 'rgba(255,68,68,0.2)', background: 'rgba(255,68,68,0.06)' }}>
                 <span className="w-2 h-2 rounded-full bg-[#ff4444] pulse-extreme" />
-                <span className="text-xs font-bold text-[#ff4444]">
-                  {state.extremeCount} Extreme
-                </span>
+                <span className="text-[#ff4444] font-bold">{state.extremeCount} Extreme</span>
               </div>
             )}
             {state.highCount > 0 && (
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#ff8c00]/10 border border-[#ff8c00]/20">
+              <div className="stat-pill" style={{ borderColor: 'rgba(255,140,0,0.2)', background: 'rgba(255,140,0,0.06)' }}>
                 <span className="w-2 h-2 rounded-full bg-[#ff8c00]" />
-                <span className="text-xs font-bold text-[#ff8c00]">
-                  {state.highCount} High
-                </span>
+                <span className="text-[#ff8c00] font-bold">{state.highCount} High</span>
               </div>
             )}
           </div>
         </div>
 
-        {/* District cards */}
-        <div className="space-y-4">
+        {/* ── Section label ── */}
+        <div className="section-label animate-fade-in-up animate-delay-200">
+          <span>District Overview</span>
+        </div>
+
+        {/* ── District cards ── */}
+        <div className="space-y-3">
           {stateDistricts.map((district, i) => (
             <button
               key={district.id}
               onClick={() => navigate(`/district/${district.id}`)}
-              className="w-full glass-surface p-7 flex flex-col md:flex-row md:items-center gap-5 hover:border-[#5ed29c]/20 transition-all group animate-fade-in-up"
-              style={{ animationDelay: `${i * 100}ms` }}
+              className="w-full glass-surface p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-4 hover:border-[#5ed29c]/20 transition-all duration-300 group animate-fade-in-up text-left"
+              style={{ animationDelay: `${250 + i * 80}ms` }}
               id={`district-card-${district.id}`}
             >
               {/* Left section */}
-              <div className="flex items-center gap-5 flex-1 min-w-0">
+              <div className="flex items-center gap-4 flex-1 min-w-0">
                 {/* Score */}
                 <div
-                  className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: getTierColor(district.tier) + '15' }}
+                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: getTierColor(district.tier) + '12' }}
                 >
                   <span
-                    className="text-xl font-black"
+                    className="text-lg sm:text-xl font-black"
                     style={{ color: getTierColor(district.tier) }}
                   >
                     {district.riskScore}
                   </span>
                 </div>
 
-                <div className="text-left min-w-0">
-                  <div className="flex items-center gap-3 mb-1.5">
-                    <h3 className="text-lg font-bold text-white truncate">{district.name}</h3>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2.5 mb-1.5">
+                    <h3 className="text-base sm:text-lg font-bold text-white truncate">{district.name}</h3>
                     <RiskBadge tier={district.tier} size="sm" pulse={district.tier === 'Extreme'} />
                   </div>
-                  <div className="flex items-center gap-5 text-xs text-white/40">
-                    <span>Rainfall: {district.rainfallMm} mm</span>
-                    <span>Slope: {district.slopeDeg}°</span>
-                    <span>Elevation: {district.elevationM} m</span>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] sm:text-xs text-white/35">
+                    <span className="flex items-center gap-1">
+                      <Droplets className="w-3 h-3 text-blue-400/50" />
+                      {district.rainfallMm} mm
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Mountain className="w-3 h-3 text-amber-400/50" />
+                      {district.slopeDeg}°
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <TrendingUp className="w-3 h-3 text-purple-400/50" />
+                      {district.elevationM} m
+                    </span>
                   </div>
                 </div>
               </div>
 
               {/* Forecast chart */}
-              <div className="w-full md:w-52 flex-shrink-0">
-                <div className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5">
+              <div className="w-full sm:w-44 md:w-52 flex-shrink-0">
+                <div className="text-[9px] text-white/25 uppercase tracking-[0.12em] font-semibold mb-1">
                   6h Forecast
                 </div>
                 <ForecastBar forecast={district.forecast} tier={district.tier} />
               </div>
 
               {/* Arrow */}
-              <ArrowRight className="w-5 h-5 text-white/20 group-hover:text-[#5ed29c] transition-colors hidden md:block flex-shrink-0" />
+              <ArrowRight className="w-4 h-4 text-white/15 group-hover:text-[#5ed29c] group-hover:translate-x-0.5 transition-all duration-300 hidden sm:block flex-shrink-0" />
             </button>
           ))}
+        </div>
+
+        <div className="footer-line">
+          FlashFlood Matrix · {state.name}
         </div>
       </div>
     </div>
